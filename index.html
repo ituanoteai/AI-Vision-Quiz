@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Vision Quiz - AR Interactive Game</title>
+    
+    <!-- Tailwind CSS & Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- MediaPipe & Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+    <!-- Firebase Compact CDN -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        * { font-family: 'Mali', cursive; user-select: none; touch-action: manipulation; }
+        body { overflow: hidden; width: 100vw; height: 100vh; background: linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #3b82f6 100%); }
+        .jelly-card { background: rgba(255, 255, 255, 0.95); border: 4px solid #ffffff; border-radius: 30px; box-shadow: 0 10px 0 0 rgba(0, 0, 0, 0.15), 0 20px 25px -5px rgba(0, 0, 0, 0.2); backdrop-filter: blur(8px); }
+        .jelly-btn { border-radius: 20px; border: 3px solid #ffffff; transition: all 0.15s ease; position: relative; }
+        .jelly-btn:active { transform: translateY(3px) !important; box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.2) !important; }
+        .btn-yellow { background: #facc15; box-shadow: 0 5px 0 0 #ca8a04; color: #713f12; }
+        .btn-blue   { background: #38bdf8; box-shadow: 0 5px 0 0 #0284c7; color: #0c4a6e; }
+        .btn-pink   { background: #f472b6; box-shadow: 0 5px 0 0 #db2777; color: #831843; }
+        .btn-purple { background: #c084fc; box-shadow: 0 5px 0 0 #9333ea; color: #581c87; }
+        .btn-green  { background: #4ade80; box-shadow: 0 5px 0 0 #16a34a; color: #14532d; }
+        
+        @keyframes popCorrect { 0% { transform: scale(1); } 50% { transform: scale(1.04); } 100% { transform: scale(1); } }
+        .pop-correct { animation: popCorrect 0.4s ease-in-out; }
+        @keyframes shakeWrong { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+        .shake-wrong { animation: shakeWrong 0.4s ease-in-out; }
+        
+        .hover-ring { position: absolute; inset: -5px; pointer-events: none; z-index: 20; }
+        .hover-ring circle { fill: none; stroke: #f59e0b; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 0.1s linear; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #c084fc; border-radius: 10px; }
+
+        .sparkle-particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 100;
+            animation: sparkleFly 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes sparkleFly {
+            0% { transform: translate(0, 0) scale(0.5) rotate(0deg); opacity: 1; }
+            100% { transform: translate(var(--dx), var(--dy)) scale(1.4) rotate(180deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="relative flex items-center justify-center p-2 md:p-4 select-none">
+
+    <video id="webcam" class="hidden" playsinline></video>
+    <canvas id="arCanvas" class="absolute inset-0 w-full h-full object-cover z-0"></canvas>
+    <canvas id="snapCanvas" class="hidden"></canvas>
+
+    <div id="pointer" class="fixed top-0 left-0 w-10 h-10 -ml-5 -mt-5 pointer-events-none z-50 hidden transition-transform duration-75">
+        <svg class="w-full h-full drop-shadow-md animate-pulse" viewBox="0 0 24 24" fill="#facc15" stroke="#ffffff" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+    </div>
+
+    <main class="relative z-10 w-full max-w-5xl h-full max-h-[96vh] flex flex-col justify-center items-center">
+
+        <!-- SCREEN 1: LOADING -->
+        <section id="loadingScreen" class="jelly-card w-full p-6 text-center flex flex-col items-center justify-center space-y-6">
+            <div class="text-6xl animate-bounce">🤖</div>
+            <h1 class="text-3xl md:text-5xl font-bold text-purple-700">AI Vision Quiz (ม.6)</h1>
+            <p class="text-base md:text-lg text-gray-600 font-semibold max-w-md">
+                กำลังเตรียมระบบ AR & AI Hand Tracking...<br>
+                <span class="text-sm text-pink-600">(กรุณาอนุญาตให้ใช้งานกล้อง)</span>
+            </p>
+            <div class="w-48 bg-gray-200 h-4 rounded-full overflow-hidden border-2 border-white shadow-inner">
+                <div id="loadingProgress" class="bg-gradient-to-r from-pink-500 to-purple-600 h-full w-1/3 transition-all duration-300"></div>
+            </div>
+            <div class="text-xs text-purple-800 font-bold bg-purple-100 px-3 py-1 rounded-full border border-white">
+                By นายพิรสิฏฐ์ พีรภัคโสภณ
+            </div>
+        </section>
+
+        <!-- SCREEN 2: START & REGISTRATION -->
+        <section id="startScreen" class="jelly-card w-full p-5 md:p-8 text-center hidden flex-col items-center justify-between space-y-3 max-h-[90vh]">
+            <div class="space-y-1">
+                <span class="inline-block px-4 py-1 bg-yellow-300 text-yellow-900 font-bold rounded-full text-xs md:text-sm border-2 border-white shadow-sm">
+                    AR Gesture Control Game
+                </span>
+                <h1 class="text-2xl md:text-4xl font-bold text-purple-800 drop-shadow">AI Vision Quiz</h1>
+                <p class="text-xs md:text-sm font-bold text-purple-600 bg-purple-100/80 inline-block px-3 py-0.5 rounded-full border border-purple-200">
+                    By นายพิรสิฏฐ์ พีรภัคโสภณ
+                </p>
+                <p class="text-xs md:text-sm text-gray-700 pt-1">ใช้นิ้วชี้เล็งค้างบนปุ่ม 1.2 วินาทีเพื่อเลือกคำตอบ</p>
+            </div>
+
+            <div class="w-full max-w-md space-y-2 text-left bg-purple-50/80 p-4 rounded-2xl border-2 border-purple-200">
+                <h3 class="font-bold text-purple-900 text-center text-sm">ลงทะเบียนผู้เรียน</h3>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-bold text-purple-900 text-xs mb-1">ห้องเรียน</label>
+                        <select id="studentClass" class="w-full px-3 py-2 rounded-xl border-2 border-purple-300 font-bold text-sm focus:outline-none">
+                            <option value="ม.6/1">ม.6/1</option>
+                            <option value="ม.6/2">ม.6/2</option>
+                            <option value="ม.6/3">ม.6/3</option>
+                            <option value="ม.6/4">ม.6/4</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-purple-900 text-xs mb-1">เลขที่</label>
+                        <input type="number" id="studentNo" min="1" max="50" placeholder="เลขที่" 
+                               class="w-full px-3 py-2 rounded-xl border-2 border-purple-300 text-center font-bold text-sm focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-purple-900 text-xs mb-1">ชื่อ - นามสกุล</label>
+                    <input type="text" id="playerName" placeholder="พิมพ์ชื่อ-นามสกุล..." 
+                           class="w-full px-3 py-2 rounded-xl border-2 border-purple-300 text-center font-bold text-sm focus:outline-none">
+                </div>
+            </div>
+
+            <button id="btnStartGame" class="hand-interact jelly-btn btn-green w-full max-w-xs py-3 text-lg md:text-xl font-bold">
+                📸 ถ่ายภาพ & เริ่มทดสอบ!
+            </button>
+        </section>
+
+        <!-- SCREEN 3: GAME PLAY -->
+        <section id="gameScreen" class="jelly-card w-full p-3 md:p-5 hidden flex-col justify-between max-h-[94vh] space-y-2.5">
+            <div class="flex justify-between items-center bg-purple-100/90 px-3 py-1.5 rounded-2xl border-2 border-white">
+                <div class="text-sm md:text-base font-bold text-purple-900">
+                    ข้อที่: <span id="qIndex" class="text-pink-600 text-lg md:text-xl">1</span>/10
+                </div>
+                <div class="flex items-center space-x-2">
+                    <img id="playerHeaderPhoto" class="w-8 h-8 rounded-full border-2 border-purple-500 object-cover hidden" alt="Player">
+                    <span id="playerHeaderName" class="text-xs md:text-sm font-bold text-purple-800 truncate max-w-[160px]"></span>
+                </div>
+                <div class="text-sm md:text-base font-bold text-purple-900">
+                    คะแนน: <span id="scoreVal" class="text-green-600 text-lg md:text-xl">0</span>
+                </div>
+            </div>
+
+            <div class="flex-1 flex items-center justify-center p-3 bg-white/80 rounded-2xl border-2 border-purple-200 text-center shadow-inner min-h-[75px] max-h-[140px]">
+                <h2 id="qText" class="text-sm md:text-lg font-bold text-gray-800 leading-snug">
+                    คำถามกำลังโหลด...
+                </h2>
+            </div>
+
+            <div id="optionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 w-full">
+                <button id="btnOpt0" data-idx="0" class="hand-interact jelly-btn btn-yellow py-2 md:py-2.5 px-3 text-xs md:text-sm font-bold text-left flex items-center space-x-2">
+                    <span class="bg-white/70 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">A</span>
+                    <span class="opt-text leading-tight w-full break-words">ตัวเลือก 1</span>
+                </button>
+                <button id="btnOpt1" data-idx="1" class="hand-interact jelly-btn btn-blue py-2 md:py-2.5 px-3 text-xs md:text-sm font-bold text-left flex items-center space-x-2">
+                    <span class="bg-white/70 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">B</span>
+                    <span class="opt-text leading-tight w-full break-words">ตัวเลือก 2</span>
+                </button>
+                <button id="btnOpt2" data-idx="2" class="hand-interact jelly-btn btn-pink py-2 md:py-2.5 px-3 text-xs md:text-sm font-bold text-left flex items-center space-x-2">
+                    <span class="bg-white/70 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">C</span>
+                    <span class="opt-text leading-tight w-full break-words">ตัวเลือก 3</span>
+                </button>
+                <button id="btnOpt3" data-idx="3" class="hand-interact jelly-btn btn-purple py-2 md:py-2.5 px-3 text-xs md:text-sm font-bold text-left flex items-center space-x-2">
+                    <span class="bg-white/70 rounded-full w-6 h-6 flex items-center justify-center text-xs font-black flex-shrink-0">D</span>
+                    <span class="opt-text leading-tight w-full break-words">ตัวเลือก 4</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- SCREEN 4: RESULT -->
+        <section id="resultScreen" class="jelly-card w-full p-3 md:p-5 hidden flex-col justify-between max-h-[92vh] space-y-2.5">
+            <div class="text-center space-y-1 flex flex-col items-center">
+                <h2 class="text-xl md:text-3xl font-bold text-purple-900">🎉 สรุปผลการทดสอบ 🎉</h2>
+                
+                <div class="flex items-center space-x-2 bg-purple-100 px-3 py-1 rounded-full border-2 border-white shadow-sm">
+                    <img id="resultPlayerPhoto" class="w-10 h-10 rounded-full border-2 border-purple-600 object-cover bg-white" alt="Player Photo">
+                    <span id="playerSummary" class="text-sm md:text-base font-bold text-purple-950"></span>
+                </div>
+
+                <div class="inline-block px-5 py-1 bg-yellow-300 text-yellow-950 font-extrabold text-lg md:text-2xl rounded-full border-2 border-white shadow-md">
+                    คะแนนรวม: <span id="finalScore">0</span> / 10 คะแนน
+                </div>
+            </div>
+
+            <div class="flex-1 bg-white/80 rounded-2xl border-2 border-purple-200 p-2.5 md:p-3 overflow-hidden flex flex-col min-h-[180px]">
+                <h3 class="text-sm md:text-base font-bold text-purple-800 border-b-2 border-purple-200 pb-1 mb-1.5 flex items-center justify-between">
+                    <span>🏆 ตารางอันดับผู้เล่น (Leaderboard)</span>
+                    <span id="serverStatus" class="text-xs text-green-600 font-bold">🟢 Online Server</span>
+                </h3>
+                
+                <div id="leaderboardList" class="flex-1 overflow-y-auto custom-scroll space-y-1.5 pr-1"></div>
+            </div>
+
+            <div class="flex justify-center">
+                <button id="btnPlayAgain" class="hand-interact jelly-btn btn-green py-2 px-6 text-base font-bold">
+                    🔄 เล่นอีกครั้ง
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- 1. FIREBASE SETUP ---
+        const firebaseConfig = {
+            databaseURL: "https://ai-tech-match-m6-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        let db = null;
+        let isFirebaseActive = false;
+
+        try {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            isFirebaseActive = true;
+        } catch (e) {
+            console.warn("Firebase Fallback:", e);
+        }
+
+        // --- 2. QUESTION BANK ---
+        const QUESTION_BANK = [
+            { id: 1, type: "K", q: "เทคนิคการประมวลผลข้อมูลซับซ้อนหลายชั้นที่เลียนแบบโครงข่ายประสาทในสมองมนุษย์ เรียกว่าอะไร?", opts: ["Deep Learning", "Basic Coding", "Flowchart", "Data Storage"], ans: 0 },
+            { id: 2, type: "K", q: "การสอนให้ AI เรียนรู้จำแนกภาพ 'หมา' กับ 'แมว' โดยมีรูปพร้อมป้ายบอกชื่อล่วงหน้า คือ ML แบบใด?", opts: ["Supervised Learning", "Unsupervised Learning", "Reinforcement Learning", "Manual Logic"], ans: 0 },
+            { id: 3, type: "K", q: "การที่แอปพลิเคชันอย่าง ChatGPT สามารถพูดคุยตอบคำถามภาษามนุษย์ได้อย่างลื่นไหล จัดอยู่ในสาขาใด?", opts: ["NLP (Natural Language Processing)", "Computer Vision", "3D Rendering", "Network Security"], ans: 0 },
+            { id: 4, type: "K", q: "การวิเคราะห์อารมณ์ความรู้สึก (Positive/Negative) จากข้อความรีวิวสินค้าใน Shopee ใช้ AI ด้านใด?", opts: ["Sentiment Analysis (NLP)", "Computer Vision", "Recommendation System", "Graphic Card"], ans: 0 },
+            { id: 5, type: "K", q: "การที่คุณเปิดมือถือสแกนใบหน้าเพื่อปลดล็อกเครื่องในชีวิตประจำวัน ใช้เทคโนโลยีใด?", opts: ["Computer Vision", "NLP", "Recommendation System", "Deep Learning Translation"], ans: 0 },
+            { id: 6, type: "K", q: "รถยนต์ไร้คนขับของ Tesla มองเห็นผู้คนและสิ่งกีดขวางบนถนนได้ด้วยเทคโนโลยีหลักใด?", opts: ["Computer Vision & Deep Learning", "NLP & Speech", "Recommendation System", "Text Parser"], ans: 0 },
+            { id: 7, type: "K", q: "การแนะนำคลิปวิดีโอ The Ghost Radio บน YouTube ตามสไตล์คลิปที่ผู้ใช้ชอบดู ทำงานด้วยระบบใด?", opts: ["Recommendation System", "Computer Vision", "Natural Language Processing", "Hardware Synthesizer"], ans: 0 },
+            { id: 8, type: "K", q: "เมื่อเรากดซื้อ 'ครีมบำรุงผิว' ในแอปส้ม แล้วระบบเด้งแนะนำ 'น้ำแร่ฉีดหน้า' ขึ้นมาให้ทันที เกิดจากระบบใด?", opts: ["Recommendation System", "Natural Language Processing", "Computer Vision", "Audio Processing"], ans: 0 },
+            { id: 9, type: "A", q: "ในการใช้ระบบ AI วิเคราะห์พฤติกรรมและการโพสต์ของผู้ใช้งาน ข้อใดสะท้อนการมีจริยธรรมมากที่สุด?", opts: ["เคารพความเป็นส่วนตัว (Privacy) และขออนุญาตผู้ใช้ก่อนนำข้อมูลไปวิเคราะห์", "แอบเก็บข้อมูลลับของผู้ใช้ไปขายต่อให้บริษัทอื่น", "นำข้อมูลส่วนตัวของเพื่อนไปโพสต์ประจานบนโซเชียล", "เพิกเฉยไม่สนใจเรื่องความปลอดภัยของข้อมูล"], ans: 0 },
+            { id: 10, type: "A", q: "หากพบว่า AI กลั่นกรองรูปภาพทำงานผิดพลาด และมีอคติ (Bias) ลบรูปของคนบางกลุ่ม นักพัฒนาที่ดีควรทำอย่างไร?", opts: ["หาชุดข้อมูลที่หลากหลายและเป็นกลางมาฝึก AI ใหม่เพื่อความเท่าเทียม", "ปล่อยไว้ตามเดิมเพราะคิดว่า AI ทำถูกเสมอ", "ต่อว่าผู้ใช้งานว่าเป็นคนทำให้ AI รวน", "ปิดระบบทิ้งแล้วเลิกพัฒนา AI ไปเลย"], ans: 0 }
+        ];
+
+        // --- 3. AUDIO ENGINE ---
+        class AudioController {
+            constructor() { this.isReady = false; this.synth = null; }
+            init() {
+                try {
+                    this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    this.synth.volume.value = -6;
+                    this.isReady = true;
+                } catch (e) { console.warn("Audio error:", e); }
+            }
+            playCorrect() { if(this.isReady) try { const n = Tone.now(); this.synth.triggerAttackRelease("E5", "8n", n); this.synth.triggerAttackRelease("C6", "4n", n + 0.1); } catch(e){} }
+            playWrong() { if(this.isReady) try { const n = Tone.now(); this.synth.triggerAttackRelease("C3", "8n", n); this.synth.triggerAttackRelease("F2", "4n", n + 0.15); } catch(e){} }
+            playHoverTick() { if(this.isReady) try { this.synth.triggerAttackRelease("C6", "32n", Tone.now()); } catch(e){} }
+            playFanfare() { if(this.isReady) try { const n = Tone.now(); this.synth.triggerAttackRelease("C4","8n",n); this.synth.triggerAttackRelease("G4","8n",n+0.1); this.synth.triggerAttackRelease("C5","4n",n+0.2); } catch(e){} }
+        }
+        const audio = new AudioController();
+
+        // --- 4. GAME LOGIC & SPARKLE EFFECT ---
+        let activeQuestions = [];
+        let currentQIndex = 0;
+        let score = 0;
+        let studentClass = "";
+        let studentNo = "";
+        let playerName = "";
+        let playerPhotoBase64 = "";
+        let studentItemResponses = {};
+
+        const loadingScreen = document.getElementById('loadingScreen');
+        const startScreen = document.getElementById('startScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const resultScreen = document.getElementById('resultScreen');
+
+        function showScreen(screen) {
+            [loadingScreen, startScreen, gameScreen, resultScreen].forEach(s => { s.classList.add('hidden'); s.classList.remove('flex'); });
+            screen.classList.remove('hidden'); screen.classList.add('flex');
+        }
+
+        function triggerSparklePop(buttonElement) {
+            const rect = buttonElement.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const starEmojis = ['✨', '⭐', '🌟', '💖', '🎉'];
+
+            for (let i = 0; i < 16; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'sparkle-particle text-xl md:text-2xl';
+                particle.innerText = starEmojis[Math.floor(Math.random() * starEmojis.length)];
+                
+                const angle = (i / 16) * 360 + (Math.random() * 20 - 10);
+                const distance = 80 + Math.random() * 70;
+                const dx = Math.cos(angle * Math.PI / 180) * distance;
+                const dy = Math.sin(angle * Math.PI / 180) * distance;
+
+                particle.style.left = `${centerX}px`;
+                particle.style.top = `${centerY}px`;
+                particle.style.setProperty('--dx', `${dx}px`);
+                particle.style.setProperty('--dy', `${dy}px`);
+
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 850);
+            }
+        }
+
+        function capturePlayerPhoto() {
+            const snapCanvas = document.getElementById('snapCanvas');
+            const snapCtx = snapCanvas.getContext('2d');
+            const video = document.getElementById('webcam');
+            snapCanvas.width = 160; snapCanvas.height = 160;
+            if (video.videoWidth > 0) {
+                snapCtx.translate(160, 0); snapCtx.scale(-1, 1);
+                const minDim = Math.min(video.videoWidth, video.videoHeight);
+                snapCtx.drawImage(video, (video.videoWidth - minDim)/2, (video.videoHeight - minDim)/2, minDim, minDim, 0, 0, 160, 160);
+                playerPhotoBase64 = snapCanvas.toDataURL('image/jpeg', 0.6);
+            }
+        }
+
+        function startNewGame() {
+            studentClass = document.getElementById('studentClass').value;
+            studentNo = document.getElementById('studentNo').value.trim() || "0";
+            playerName = document.getElementById('playerName').value.trim();
+            
+            if (!playerName) {
+                alert("กรุณากรอกชื่อ-นามสกุลก่อนเริ่มเกมครับ");
+                return;
+            }
+
+            capturePlayerPhoto();
+
+            document.getElementById('playerHeaderName').innerText = `${studentClass} เลขที่ ${studentNo} ${playerName}`;
+            if (playerPhotoBase64) {
+                document.getElementById('playerHeaderPhoto').src = playerPhotoBase64;
+                document.getElementById('playerHeaderPhoto').classList.remove('hidden');
+            }
+
+            activeQuestions = [...QUESTION_BANK].sort(() => 0.5 - Math.random());
+            currentQIndex = 0;
+            score = 0;
+            studentItemResponses = {};
+
+            document.getElementById('scoreVal').innerText = "0";
+            showQuestion(currentQIndex);
+            showScreen(gameScreen);
+        }
+
+        function showQuestion(idx) {
+            if (idx >= activeQuestions.length) {
+                endGame();
+                return;
+            }
+
+            const data = activeQuestions[idx];
+            document.getElementById('qIndex').innerText = idx + 1;
+            document.getElementById('qText').innerText = `[${data.type}] ${data.q}`;
+
+            const opts = data.opts.map((text, originalIdx) => ({ text, isCorrect: originalIdx === data.ans }));
+            const shuffledOpts = [...opts].sort(() => 0.5 - Math.random());
+
+            for (let i = 0; i < 4; i++) {
+                const btn = document.getElementById(`btnOpt${i}`);
+                btn.querySelector('.opt-text').innerText = shuffledOpts[i].text;
+                btn.dataset.correct = shuffledOpts[i].isCorrect;
+                btn.dataset.qid = data.id;
+                btn.classList.remove('pop-correct', 'shake-wrong');
+                btn.disabled = false;
+            }
+        }
+
+        function handleAnswerSelection(btnElement) {
+            for (let i = 0; i < 4; i++) document.getElementById(`btnOpt${i}`).disabled = true;
+
+            const isCorrect = btnElement.dataset.correct === "true";
+            const qId = btnElement.dataset.qid;
+
+            studentItemResponses[`q_${qId}`] = isCorrect ? 1 : 0;
+
+            if (isCorrect) {
+                btnElement.classList.add('pop-correct');
+                triggerSparklePop(btnElement);
+                score += 1;
+                document.getElementById('scoreVal').innerText = score;
+                audio.playCorrect();
+            } else {
+                btnElement.classList.add('shake-wrong');
+                audio.playWrong();
+            }
+
+            setTimeout(() => {
+                currentQIndex++;
+                showQuestion(currentQIndex);
+            }, 1200);
+        }
+
+        function endGame() {
+            audio.playFanfare();
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('playerSummary').innerText = `${studentClass} เลขที่ ${studentNo} ${playerName}`;
+            document.getElementById('resultPlayerPhoto').src = playerPhotoBase64 || "";
+
+            saveScoreToServer();
+            showScreen(resultScreen);
+        }
+
+        function saveScoreToServer() {
+            const payload = {
+                studentClass: studentClass,
+                studentNo: studentNo,
+                name: playerName,
+                score: score,
+                photo: playerPhotoBase64 || "",
+                itemResponses: studentItemResponses,
+                timestamp: Date.now()
+            };
+
+            if (isFirebaseActive && db) {
+                try { db.ref('student_results').push(payload); } catch (e) { console.warn(e); }
+            }
+
+            try {
+                let board = JSON.parse(localStorage.getItem('ai_game_results') || '[]');
+                board.push(payload);
+                localStorage.setItem('ai_game_results', JSON.stringify(board));
+            } catch (e) {}
+        }
+
+        function listenLeaderboardRealtime() {
+            if (isFirebaseActive && db) {
+                db.ref('student_results').orderByChild('score').limitToLast(20).on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    let board = [];
+                    if (data) {
+                        Object.keys(data).forEach(k => board.push(data[k]));
+                        board.sort((a, b) => b.score - a.score);
+                    }
+                    renderLeaderboard(board);
+                });
+            }
+        }
+
+        function renderLeaderboard(board) {
+            const list = document.getElementById('leaderboardList');
+            list.innerHTML = '';
+            if (!board || board.length === 0) {
+                list.innerHTML = `<div class="text-center py-4 text-gray-500">ยังไม่มีข้อมูลคะแนน</div>`;
+                return;
+            }
+            board.forEach((item, idx) => {
+                const rank = idx + 1;
+                const row = document.createElement('div');
+                row.className = `flex justify-between items-center px-3 py-1.5 rounded-xl text-xs ${rank<=3?'bg-yellow-100 font-bold':'bg-gray-100'}`;
+                row.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate">
+                        <span class="font-bold">#${rank}</span>
+                        <img src="${item.photo}" class="w-6 h-6 rounded-full object-cover bg-white" alt="img">
+                        <span class="truncate">${item.studentClass} ${item.name}</span>
+                    </div>
+                    <div class="font-black text-purple-900">${item.score}/10 คะแนน</div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        // --- 5. HOVER AR INTERACTION ---
+        let currentTarget = null, hoverStartTime = null;
+        const HOVER_DURATION = 1200;
+
+        function processHoverTrigger(x, y) {
+            const elements = document.elementsFromPoint(x, y);
+            const interactable = elements.find(el => el.classList && el.classList.contains('hand-interact') && !el.disabled);
+            if (interactable) {
+                if (currentTarget !== interactable) {
+                    resetHover(); currentTarget = interactable; hoverStartTime = performance.now();
+                    attachHoverRing(currentTarget); audio.playHoverTick();
+                } else {
+                    const elapsed = performance.now() - hoverStartTime;
+                    const ring = currentTarget.querySelector('.hover-ring circle');
+                    if(ring) ring.style.strokeDashoffset = 283 * (1 - Math.min(elapsed/HOVER_DURATION, 1.0));
+                    if (elapsed >= HOVER_DURATION) { const btn = currentTarget; resetHover(); btn.click(); }
+                }
+            } else resetHover();
+        }
+
+        function attachHoverRing(btn) {
+            if (btn.querySelector('.hover-ring')) return;
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("class", "hover-ring"); svg.setAttribute("viewBox", "0 0 100 100");
+            const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            c.setAttribute("cx","50"); c.setAttribute("cy","50"); c.setAttribute("r","45");
+            svg.appendChild(c); btn.appendChild(svg);
+        }
+
+        function resetHover() {
+            if (currentTarget && currentTarget.querySelector('.hover-ring')) currentTarget.querySelector('.hover-ring').remove();
+            currentTarget = null; hoverStartTime = null;
+        }
+
+        // --- 6. MEDIAPIPE HANDS & SKELETON TRACKING OVERLAY ---
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('arCanvas');
+        const canvasCtx = canvasElement.getContext('2d');
+
+        function drawHandSkeleton(ctx, landmarks, width, height) {
+            const HAND_CONNECTIONS = [
+                [0,1],[1,2],[2,3],[3,4],
+                [0,5],[5,6],[6,7],[7,8],
+                [5,9],[9,10],[10,11],[11,12],
+                [9,13],[13,14],[14,15],[15,16],
+                [13,17],[17,18],[18,19],[19,20],[0,17]
+            ];
+
+            ctx.strokeStyle = "rgba(236, 72, 153, 0.85)";
+            ctx.lineWidth = 5;
+            ctx.lineCap = "round";
+
+            HAND_CONNECTIONS.forEach(([i, j]) => {
+                const p1 = landmarks[i];
+                const p2 = landmarks[j];
+                ctx.beginPath();
+                ctx.moveTo(p1.x * width, p1.y * height);
+                ctx.lineTo(p2.x * width, p2.y * height);
+                ctx.stroke();
+            });
+
+            landmarks.forEach((lm) => {
+                ctx.fillStyle = "#facc15";
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(lm.x * width, lm.y * height, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+
+        function onResults(results) {
+            if (!loadingScreen.classList.contains('hidden')) {
+                document.getElementById('loadingProgress').style.width = '100%';
+                setTimeout(() => { showScreen(startScreen); listenLeaderboardRealtime(); }, 300);
+            }
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1);
+            if (results.image) canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+
+                drawHandSkeleton(canvasCtx, landmarks, canvasElement.width, canvasElement.height);
+
+                const indexTip = landmarks[8];
+                const screenX = (1 - indexTip.x) * window.innerWidth;
+                const screenY = indexTip.y * window.innerHeight;
+
+                const ptr = document.getElementById('pointer');
+                ptr.classList.remove('hidden');
+                ptr.style.transform = `translate3d(${screenX}px, ${screenY}px, 0px)`;
+                processHoverTrigger(screenX, screenY);
+            } else {
+                document.getElementById('pointer').classList.add('hidden');
+                resetHover();
+            }
+            canvasCtx.restore();
+        }
+
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 1280, height: 720 });
+
+        document.getElementById('btnStartGame').addEventListener('click', () => { audio.init(); startNewGame(); });
+        document.getElementById('btnPlayAgain').addEventListener('click', () => { showScreen(startScreen); });
+        for (let i = 0; i < 4; i++) document.getElementById(`btnOpt${i}`).addEventListener('click', function() { handleAnswerSelection(this); });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight;
+            camera.start();
+        });
+    </script>
+</body>
+</html>
