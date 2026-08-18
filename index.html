@@ -21,8 +21,9 @@
         * { font-family: 'Mali', cursive; user-select: none; touch-action: manipulation; }
         body { overflow: hidden; width: 100vw; height: 100vh; background: linear-gradient(135deg, #a855f7 0%, #ec4899 50%, #3b82f6 100%); }
         .jelly-card { background: rgba(255, 255, 255, 0.95); border: 4px solid #ffffff; border-radius: 30px; box-shadow: 0 10px 0 0 rgba(0, 0, 0, 0.15), 0 20px 25px -5px rgba(0, 0, 0, 0.2); backdrop-filter: blur(8px); }
-        .jelly-btn { border-radius: 20px; border: 3px solid #ffffff; transition: all 0.15s ease; position: relative; }
+        .jelly-btn { border-radius: 20px; border: 3px solid #ffffff; transition: all 0.15s ease; position: relative; cursor: pointer; }
         .jelly-btn:active { transform: translateY(3px) !important; box-shadow: 0 2px 0 0 rgba(0, 0, 0, 0.2) !important; }
+        .jelly-btn:hover { filter: brightness(1.05); }
         .btn-yellow { background: #facc15; box-shadow: 0 5px 0 0 #ca8a04; color: #713f12; }
         .btn-blue   { background: #38bdf8; box-shadow: 0 5px 0 0 #0284c7; color: #0c4a6e; }
         .btn-pink   { background: #f472b6; box-shadow: 0 5px 0 0 #db2777; color: #831843; }
@@ -66,16 +67,21 @@
 
     <main class="relative z-10 w-full max-w-5xl h-full max-h-[96vh] flex flex-col justify-center items-center">
 
-        <section id="loadingScreen" class="jelly-card w-full p-6 text-center flex flex-col items-center justify-center space-y-6">
+        <section id="loadingScreen" class="jelly-card w-full p-6 text-center flex flex-col items-center justify-center space-y-5">
             <div class="text-6xl animate-bounce">🤖</div>
             <h1 class="text-3xl md:text-5xl font-bold text-purple-700">AI Vision Quiz (ม.6)</h1>
-            <p class="text-base md:text-lg text-gray-600 font-semibold max-w-md">
+            <p id="loadingStatusText" class="text-base md:text-lg text-gray-600 font-semibold max-w-md">
                 กำลังเตรียมระบบ AR & AI Hand Tracking...<br>
-                <span class="text-sm text-pink-600">(กรุณาอนุญาตให้ใช้งานกล้อง)</span>
+                <span class="text-sm text-pink-600">(กรุณาอนุญาตให้ใช้งานกล้อง หรือกดเล่นด้วยเมาส์)</span>
             </p>
             <div class="w-48 bg-gray-200 h-4 rounded-full overflow-hidden border-2 border-white shadow-inner">
                 <div id="loadingProgress" class="bg-gradient-to-r from-pink-500 to-purple-600 h-full w-1/3 transition-all duration-300"></div>
             </div>
+
+            <button id="btnSkipCamera" class="jelly-btn btn-blue px-6 py-2 text-sm font-bold shadow-md">
+                🖱️ เล่นด้วยเมาส์ / จอสัมผัส (ไม่ใช้กล้อง)
+            </button>
+
             <div class="text-xs text-purple-800 font-bold bg-purple-100 px-3 py-1 rounded-full border border-white">
                 By นายพิรสิฏฐ์ พีรภัคโสภณ
             </div>
@@ -84,13 +90,13 @@
         <section id="startScreen" class="jelly-card w-full p-5 md:p-8 text-center hidden flex-col items-center justify-between space-y-3 max-h-[90vh]">
             <div class="space-y-1">
                 <span class="inline-block px-4 py-1 bg-yellow-300 text-yellow-900 font-bold rounded-full text-xs md:text-sm border-2 border-white shadow-sm">
-                    AR Gesture Control Game
+                    AR Gesture & Touch Interactive Game
                 </span>
                 <h1 class="text-2xl md:text-4xl font-bold text-purple-800 drop-shadow">AI Vision Quiz</h1>
                 <p class="text-xs md:text-sm font-bold text-purple-600 bg-purple-100/80 inline-block px-3 py-0.5 rounded-full border border-purple-200">
                     By นายพิรสิฏฐ์ พีรภัคโสภณ
                 </p>
-                <p class="text-xs md:text-sm text-gray-700 pt-1">ใช้นิ้วชี้เล็งค้างบนปุ่ม 1.2 วินาทีเพื่อเลือกคำตอบ</p>
+                <p class="text-xs md:text-sm text-gray-700 pt-1">ใช้นิ้วชี้เล็งค้าง 1.2 วินาที หรือคลิกเมาส์/แตะจอเพื่อเลือกคำตอบ</p>
             </div>
 
             <div class="w-full max-w-md space-y-2 text-left bg-purple-50/80 p-4 rounded-2xl border-2 border-purple-200">
@@ -122,7 +128,7 @@
             </div>
 
             <button id="btnStartGame" class="hand-interact jelly-btn btn-green w-full max-w-xs py-3 text-lg md:text-xl font-bold">
-                📸 ถ่ายภาพ & เริ่มทดสอบ!
+                🚀 เริ่มทำแบบทดสอบ!
             </button>
         </section>
 
@@ -215,7 +221,7 @@
             console.warn("Firebase Fallback:", e);
         }
 
-        // --- 2. QUESTION BANK (ปรับแก้ข้อ 2 และข้อ 4 ให้ตรงตามแผนการสอน) ---
+        // --- 2. QUESTION BANK ---
         const QUESTION_BANK = [
             { id: 1, type: "K", q: "เทคนิคการประมวลผลข้อมูลซับซ้อนหลายชั้นที่เลียนแบบโครงข่ายประสาทในสมองมนุษย์ เรียกว่าอะไร?", opts: ["Deep Learning", "Basic Coding", "Flowchart", "Data Storage"], ans: 0 },
             { id: 2, type: "K", q: "ข้อใดคือความแตกต่างสำคัญระหว่าง Machine Learning แบบดั้งเดิม กับ Deep Learning?", opts: ["Deep Learning สามารถสกัดและเรียนรู้คุณลักษณะได้เองอัตโนมัติ", "Machine Learning ทำงานได้โดยไม่ต้องอาศัยข้อมูลนำเข้า", "Deep Learning จำเป็นต้องให้มนุษย์ป้อนคุณลักษณะของข้อมูลก่อนเสมอ", "Machine Learning มีโครงข่ายประสาทที่ซับซ้อนกว่า Deep Learning"], ans: 0 },
@@ -255,6 +261,7 @@
         let playerName = "";
         let playerPhotoBase64 = "";
         let studentItemResponses = {};
+        let isCameraAvailable = false;
 
         const loadingScreen = document.getElementById('loadingScreen');
         const startScreen = document.getElementById('startScreen');
@@ -293,6 +300,7 @@
         }
 
         function capturePlayerPhoto() {
+            if (!isCameraAvailable) return;
             const snapCanvas = document.getElementById('snapCanvas');
             const snapCtx = snapCanvas.getContext('2d');
             const video = document.getElementById('webcam');
@@ -321,6 +329,8 @@
             if (playerPhotoBase64) {
                 document.getElementById('playerHeaderPhoto').src = playerPhotoBase64;
                 document.getElementById('playerHeaderPhoto').classList.remove('hidden');
+            } else {
+                document.getElementById('playerHeaderPhoto').classList.add('hidden');
             }
 
             activeQuestions = [...QUESTION_BANK].sort(() => 0.5 - Math.random());
@@ -357,6 +367,7 @@
         }
 
         function handleAnswerSelection(btnElement) {
+            if (btnElement.disabled) return;
             for (let i = 0; i < 4; i++) document.getElementById(`btnOpt${i}`).disabled = true;
 
             const isCorrect = btnElement.dataset.correct === "true";
@@ -385,7 +396,7 @@
             audio.playFanfare();
             document.getElementById('finalScore').innerText = score;
             document.getElementById('playerSummary').innerText = `${studentClass} เลขที่ ${studentNo} ${playerName}`;
-            document.getElementById('resultPlayerPhoto').src = playerPhotoBase64 || "";
+            document.getElementById('resultPlayerPhoto').src = playerPhotoBase64 || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c084fc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
             saveScoreToServer();
             showScreen(resultScreen);
@@ -438,10 +449,11 @@
                 const rank = idx + 1;
                 const row = document.createElement('div');
                 row.className = `flex justify-between items-center px-3 py-1.5 rounded-xl text-xs ${rank<=3?'bg-yellow-100 font-bold':'bg-gray-100'}`;
+                const photoSrc = item.photo || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23c084fc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
                 row.innerHTML = `
                     <div class="flex items-center space-x-2 truncate">
                         <span class="font-bold">#${rank}</span>
-                        <img src="${item.photo}" class="w-6 h-6 rounded-full object-cover bg-white" alt="img">
+                        <img src="${photoSrc}" class="w-6 h-6 rounded-full object-cover bg-white" alt="img">
                         <span class="truncate">${item.studentClass} ${item.name}</span>
                     </div>
                     <div class="font-black text-purple-900">${item.score}/10 คะแนน</div>
@@ -523,6 +535,7 @@
         }
 
         function onResults(results) {
+            isCameraAvailable = true;
             if (!loadingScreen.classList.contains('hidden')) {
                 document.getElementById('loadingProgress').style.width = '100%';
                 setTimeout(() => { showScreen(startScreen); listenLeaderboardRealtime(); }, 300);
@@ -561,13 +574,34 @@
 
         const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 1280, height: 720 });
 
+        // Event Listeners
         document.getElementById('btnStartGame').addEventListener('click', () => { audio.init(); startNewGame(); });
         document.getElementById('btnPlayAgain').addEventListener('click', () => { showScreen(startScreen); });
-        for (let i = 0; i < 4; i++) document.getElementById(`btnOpt${i}`).addEventListener('click', function() { handleAnswerSelection(this); });
+        
+        // ปุ่มข้ามการเปิดกล้องเมื่ออุปกรณ์ไม่รองรับ
+        document.getElementById('btnSkipCamera').addEventListener('click', () => {
+            isCameraAvailable = false;
+            audio.init();
+            showScreen(startScreen);
+            listenLeaderboardRealtime();
+        });
+
+        // รองรับการคลิกเมาส์ / แตะหน้าจอเพื่อตอบโดยตรง
+        for (let i = 0; i < 4; i++) {
+            document.getElementById(`btnOpt${i}`).addEventListener('click', function() { 
+                handleAnswerSelection(this); 
+            });
+        }
 
         window.addEventListener('DOMContentLoaded', () => {
-            canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight;
-            camera.start();
+            canvasElement.width = window.innerWidth; 
+            canvasElement.height = window.innerHeight;
+            
+            // พยายามเริ่มกล้อง หากเปิดไม่ได้ระบบยังให้กดเล่นผ่านเมาส์ได้
+            camera.start().catch((err) => {
+                console.warn("Camera start failed / No camera:", err);
+                document.getElementById('loadingStatusText').innerHTML = "ไม่พบกล้องเว็บแคม หรือยังไม่ได้อนุญาตการเข้าถึง<br><span class='text-sm text-yellow-600 font-bold'>คุณยังสามารถเล่นด้วยเมาส์หรือจอสัมผัสได้</span>";
+            });
         });
     </script>
 </body>
