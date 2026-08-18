@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase Compact CDN -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
@@ -20,14 +19,12 @@
 <body class="p-4 md:p-8">
 
     <div class="max-w-7xl mx-auto space-y-6">
-        <!-- Header -->
         <header class="bg-purple-900 text-white p-6 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold">📊 Dashboard วิเคราะห์ผลการเรียนรู้ AI Vision Quiz</h1>
                 <p class="text-purple-200 text-sm mt-1">
                     รายงานสรุปผู้เรียนรายบุคคล & วิเคราะห์คุณภาพข้อสอบ (Realtime Item Analysis 10 ข้อ)
                 </p>
-                <!-- ชื่อผู้จัดทำ -->
                 <p class="text-xs font-bold text-yellow-300 mt-1 bg-purple-800/80 inline-block px-3 py-0.5 rounded-full border border-purple-700">
                     จัดทำโดย: นายพิรสิฏฐ์ พีรภัคโสภณ
                 </p>
@@ -51,7 +48,6 @@
             </div>
         </header>
 
-        <!-- Overview Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-white p-5 rounded-2xl border-2 border-purple-100 shadow-sm text-center">
                 <div class="text-gray-500 text-xs font-bold">จำนวนผู้เข้าทดสอบทั้งหมด</div>
@@ -71,7 +67,6 @@
             </div>
         </div>
 
-        <!-- SECTION 1: ITEM ANALYSIS TABLE -->
         <section class="bg-white p-6 rounded-3xl border-2 border-purple-100 shadow-sm space-y-4">
             <h2 class="text-lg font-bold text-purple-900 flex items-center justify-between">
                 <span>📈 ตารางวิเคราะห์คุณภาพตัวข้อสอบ Realtime (Item Analysis)</span>
@@ -84,7 +79,6 @@
                         <tr class="bg-purple-100 text-purple-900 font-bold border-b border-purple-200">
                             <th class="p-3">ข้อที่</th>
                             <th class="p-3">ด้าน (K/A)</th>
-                            <th class="p-3">ค่า IOC (ผู้เชี่ยวชาญ)</th>
                             <th class="p-3">อัตราความยากง่าย (P)</th>
                             <th class="p-3">แปลผลความยาก</th>
                             <th class="p-3">อำนาจจำแนก (r)</th>
@@ -96,7 +90,6 @@
             </div>
         </section>
 
-        <!-- SECTION 2: STUDENT RESPONSE MATRIX -->
         <section class="bg-white p-6 rounded-3xl border-2 border-purple-100 shadow-sm space-y-4">
             <h2 class="text-lg font-bold text-purple-900">📑 รายงานการตอบถูก-ผิด รายบุคคล (Student Matrix 10 ข้อ)</h2>
             <div class="overflow-x-auto">
@@ -126,7 +119,6 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const IOC_DATA = [1.00, 1.00, 1.00, 0.67, 1.00, 1.00, 1.00, 1.00, 1.00, 0.67];
         const KPA_TYPES = ["K","K","K","K","K","K","K","K","A","A"];
 
         let allData = [];
@@ -169,7 +161,7 @@
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-gray-400">ยังไม่มีข้อมูลผู้เข้าสอบ</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">ยังไม่มีข้อมูลผู้เข้าสอบ</td></tr>`;
                 return;
             }
 
@@ -202,7 +194,6 @@
                 tr.innerHTML = `
                     <td class="p-3 font-bold">ข้อที่ ${i}</td>
                     <td class="p-3 font-bold text-purple-700">${KPA_TYPES[i-1]}</td>
-                    <td class="p-3">${IOC_DATA[i-1].toFixed(2)}</td>
                     <td class="p-3 font-mono">${P.toFixed(2)}</td>
                     <td class="p-3 ${pColor}">${pText}</td>
                     <td class="p-3 font-mono">${r.toFixed(2)}</td>
