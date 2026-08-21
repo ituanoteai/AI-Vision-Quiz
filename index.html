@@ -207,7 +207,7 @@
     <script>
         // --- 1. FIREBASE SETUP ---
         const firebaseConfig = {
-            databaseURL: "https://ai-tech-match-m6-default-rtdb.asia-southeast1.firebasedatabase.app"
+            databaseURL: "https://ai-vision-quiz-default-rtdb.asia-southeast1.firebasedatabase.app"
         };
 
         let db = null;
@@ -578,7 +578,6 @@
         document.getElementById('btnStartGame').addEventListener('click', () => { audio.init(); startNewGame(); });
         document.getElementById('btnPlayAgain').addEventListener('click', () => { showScreen(startScreen); });
         
-        // ปุ่มข้ามการเปิดกล้องเมื่ออุปกรณ์ไม่รองรับ
         document.getElementById('btnSkipCamera').addEventListener('click', () => {
             isCameraAvailable = false;
             audio.init();
@@ -586,7 +585,6 @@
             listenLeaderboardRealtime();
         });
 
-        // รองรับการคลิกเมาส์ / แตะหน้าจอเพื่อตอบโดยตรง
         for (let i = 0; i < 4; i++) {
             document.getElementById(`btnOpt${i}`).addEventListener('click', function() { 
                 handleAnswerSelection(this); 
@@ -597,7 +595,6 @@
             canvasElement.width = window.innerWidth; 
             canvasElement.height = window.innerHeight;
             
-            // พยายามเริ่มกล้อง หากเปิดไม่ได้ระบบยังให้กดเล่นผ่านเมาส์ได้
             camera.start().catch((err) => {
                 console.warn("Camera start failed / No camera:", err);
                 document.getElementById('loadingStatusText').innerHTML = "ไม่พบกล้องเว็บแคม หรือยังไม่ได้อนุญาตการเข้าถึง<br><span class='text-sm text-yellow-600 font-bold'>คุณยังสามารถเล่นด้วยเมาส์หรือจอสัมผัสได้</span>";
